@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="local.boxtools"
+    android:versionCode="7"
+    android:versionName="1.6">
+
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
+
+    <!-- Lets MiniCarHome (same signing key) ask the gesture service to close an app window, e.g. before resizing it. -->
+    <permission android:name="local.boxtools.permission.CONTROL" android:protectionLevel="signature" />
+
+    <!-- Not grantable at install; granted once over ADB: pm grant local.boxtools android.permission.WRITE_SECURE_SETTINGS -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
+    <application android:label="Box Tools" android:icon="@drawable/ic_wifi_debug" android:allowBackup="false">
+
+        <activity android:name=".StockHomeActivity"
+            android:label="Stock Home"
+            android:icon="@drawable/ic_home"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".WirelessDebugActivity"
+            android:label="Wireless Debug"
+            android:icon="@drawable/ic_wifi_debug"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Enabled over ADB: settings put secure enabled_accessibility_services local.boxtools/.NavGestureService -->
+        <service android:name=".NavGestureService"
+            android:label="@string/nav_gesture_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice"
+                android:resource="@xml/nav_gesture_service" />
+        </service>
+    </application>
+</manifest>

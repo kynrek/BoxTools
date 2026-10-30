@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_gesture_label">Box Tools edge gestures</string>
+    <string name="nav_gesture_description">Swipe in from the left or right edge for Back, swipe up from the bottom for Home, and swipe up and pause for Recent apps. Uses window positions only to close and reopen the Maps window when MiniCarHome resizes it.</string>
+</resources>
