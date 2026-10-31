@@ -23,8 +23,8 @@ also works on its own with any launcher.
   box's IP address. Without the permission below it opens Developer options instead.
 - **Stock Home icon.** Opens the box's original launcher, even while another app is the default home.
 - **Window closing for MiniCarHome.** Android won't let one app resize another app's open window. When
-  MiniCarHome changes its panel width or side, or swaps the app in its main window, it asks Box Tools to
-  tap the old window's close button, then reopens the app at the new size. This uses a signature
+  MiniCarHome changes its panel width or side, it asks Box Tools to tap the old window's close
+  button, then reopens the app at the new size. This uses a signature
   permission (`local.boxtools.permission.CONTROL`), so only apps signed with the same key can ask.
 
 The accessibility service doesn't read what's on screen: it uses the window list only to find the
