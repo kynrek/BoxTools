@@ -10,7 +10,8 @@ O=$P/out
 rm -rf $O && mkdir -p $O/flat $O/classes
 $BT/aapt2 compile --dir $P/res -o $O/flat/res.zip
 $BT/aapt2 link -I $JAR --manifest $P/AndroidManifest.xml -o $O/base.apk $O/flat/res.zip
-javac -nowarn --release 11 -classpath $JAR -d $O/classes $(find $P/src -name '*.java') 2>&1 | grep -v -- '^warning' || true
+javac -nowarn --release 11 -classpath $JAR -d $O/classes $(find $P/src -name '*.java') >$O/javac.log 2>&1 || { cat $O/javac.log; exit 1; }
+grep -v -- '^warning' $O/javac.log || true
 $BT/d8 --release --min-api 29 --lib $JAR --output $O $(find $O/classes -name '*.class')
 (cd $O && zip -q -j base.apk classes.dex)
 $BT/zipalign -f -p 4 $O/base.apk $O/aligned.apk

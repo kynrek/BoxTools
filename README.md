@@ -22,6 +22,12 @@ also works on its own with any launcher.
   often when its wireless CarPlay link drops. Tap this icon to turn it straight back on; it shows the
   box's IP address. Without the permission below it opens Developer options instead.
 - **Stock Home icon.** Opens the box's original launcher, even while another app is the default home.
+- **Starts Shizuku after every boot.** [Shizuku](https://github.com/RikkaApps/Shizuku) stops when the box
+  reboots, and its own start-on-boot needs Wireless debugging, which needs Wi-Fi the box often doesn't
+  have in the car. The MMB box's firmware keeps ADB listening on port 5555 on the box itself, so Box
+  Tools connects there with its own ADB key and runs Shizuku's starter, as a computer would. It leaves
+  Shizuku alone if it's already running. The first connection makes Android ask to allow USB debugging
+  (the MMB box answers that by itself). Nothing happens if Shizuku isn't installed.
 - **Window closing for MiniCarHome.** Android won't let one app resize another app's open window. When
   MiniCarHome changes its panel width or side, it asks Box Tools to tap the old window's close
   button, then reopens the app at the new size. This uses a signature
@@ -29,6 +35,10 @@ also works on its own with any launcher.
 
 The accessibility service doesn't read what's on screen: it uses the window list only to find the
 window it's asked to close.
+
+**Note on the MMB box's ADB:** its firmware keeps ADB open on port 5555 and approves new debugging keys
+without asking, so any app on the box, or any device on the same Wi-Fi network, can get adb-level access.
+That was true before Box Tools; the Shizuku start relies on it.
 
 ## Install
 

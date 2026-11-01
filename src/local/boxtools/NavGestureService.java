@@ -73,6 +73,7 @@ public class NavGestureService extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
+        ShizukuStarter.startInBackground(this);   // this service starts with every boot
         registerReceiver(closeReceiver, new IntentFilter(ACTION_CLOSE_WINDOW), "local.boxtools.permission.CONTROL", null,
                 Context.RECEIVER_EXPORTED);
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
