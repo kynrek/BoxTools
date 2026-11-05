@@ -21,6 +21,11 @@ also works on its own with any launcher.
 - **Wireless Debug icon.** The box switches Wireless debugging off whenever it reboots, which happens
   often when its wireless CarPlay link drops. Tap this icon to turn it straight back on; it shows the
   box's IP address. Without the permission below it opens Developer options instead.
+- **Car audio kept awake (on by default).** Android puts an audio output to sleep after 3 seconds of
+  silence, and waking it cut off the first half second of each navigation prompt. Box Tools plays
+  inaudible noise (about -90 dB) into both speaker outputs so they never sleep. It holds no audio focus
+  and shows nothing as playing. The **Car Audio Awake** icon switches it off and on; if the car won't go
+  back to its own radio while it's on, switch it off.
 - **Stock Home icon.** Opens the box's original launcher, even while another app is the default home.
 - **Starts Shizuku after every boot.** [Shizuku](https://github.com/RikkaApps/Shizuku) stops when the box
   reboots, and its own start-on-boot needs Wireless debugging, which needs Wi-Fi the box often doesn't
