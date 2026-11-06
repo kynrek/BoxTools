@@ -26,6 +26,7 @@ import android.view.accessibility.AccessibilityEvent;
  *   swipe up from the bottom edge        -> Home
  *   swipe up from the bottom and pause   -> Recent apps
  * Thin invisible accessibility overlays catch the swipes; everything else passes through to apps.
+ * Recent apps is Box Tools' own screen ({@link RecentsOverlay}), not Android's (drawn by the vendor launcher).
  */
 public class NavGestureService extends AccessibilityService {
     private static final int EDGE_DP = 14;         // touch strip thickness
@@ -35,6 +36,7 @@ public class NavGestureService extends AccessibilityService {
 
     private WindowManager wm;
     private final View[] strips = new View[3];
+    private RecentsOverlay recents;
 
     /**
      * MiniCarHome sends this (signature permission) with a package name to close that app's freeform window,
@@ -88,6 +90,7 @@ public class NavGestureService extends AccessibilityService {
         replaced.addDataScheme("package");
         registerReceiver(packageReceiver, replaced);
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+        recents = new RecentsOverlay(this, wm);   // before the strips, so they stay on top of it
         DisplayMetrics dm = getResources().getDisplayMetrics();
         int edge = Math.round(EDGE_DP * dm.density);
         strips[0] = addStrip(Gravity.START | Gravity.CENTER_VERTICAL, edge, WindowManager.LayoutParams.MATCH_PARENT, Edge.LEFT);
@@ -129,6 +132,7 @@ public class NavGestureService extends AccessibilityService {
                     downX = holdX = x; downY = holdY = y;
                     holdSince = SystemClock.uptimeMillis();
                     armed = false;
+                    if (edge == Edge.BOTTOM) recents.prepare();   // list + screenshot ready before the pause
                     return true;
                 case MotionEvent.ACTION_MOVE:
                     if (Math.hypot(x - holdX, y - holdY) > HOLD_SLOP_DP * d) {
@@ -140,8 +144,15 @@ public class NavGestureService extends AccessibilityService {
                     if (armed || travelled(x, y) >= TRIGGER_DP * d) {
                         if (edge == Edge.BOTTOM) {
                             boolean paused = SystemClock.uptimeMillis() - holdSince >= HOLD_MS;
-                            performGlobalAction(paused ? GLOBAL_ACTION_RECENTS : GLOBAL_ACTION_HOME);
-                            if (!paused) HomeKeeper.rememberInBackground(NavGestureService.this);
+                            if (paused) {
+                                recents.show();
+                            } else {
+                                recents.hide();
+                                performGlobalAction(GLOBAL_ACTION_HOME);
+                                HomeKeeper.rememberInBackground(NavGestureService.this);
+                            }
+                        } else if (recents.isShown()) {
+                            recents.hide();   // Back closes Recent apps
                         } else {
                             performGlobalAction(GLOBAL_ACTION_BACK);
                         }
@@ -175,6 +186,7 @@ public class NavGestureService extends AccessibilityService {
         for (View v : strips) {
             if (v != null) try { wm.removeView(v); } catch (RuntimeException ignored) { }
         }
+        if (recents != null) recents.destroy();
         super.onDestroy();
     }
 }

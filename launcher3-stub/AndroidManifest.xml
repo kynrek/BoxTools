@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Stand-in for the MMB box's vendor launcher (com.android.launcher3, /system_ext/priv-app/APMLauncher3).
+  The firmware reinstalls and re-enables the stock one at every boot, so it can't be removed or kept disabled;
+  but it's signed with the public AOSP test platform key, so this app, signed with the same key, installs as an
+  update to it. It has no services (nothing for SystemUI or TinkerCore to start) and isn't a home screen; its one
+  screen, at the stock main screen's name, hands anything that opens it to the real home screen (MiniMap).
+  Undo: adb uninstall com.android.launcher3 (removes the update; the stock launcher is back).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.android.launcher3"
+    android:versionCode="1000"
+    android:versionName="stub-1">
+
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
+
+    <application android:label="Launcher (stub)" android:allowBackup="false" android:hasCode="true">
+        <activity android:name=".uioverrides.QuickstepLauncher"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="true" />
+    </application>
+</manifest>

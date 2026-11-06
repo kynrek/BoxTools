@@ -37,6 +37,20 @@ also works on its own with any launcher.
   calls it through a content provider (`local.boxtools.shell`) that only apps holding the permission
   below can use. Before 1.9, Box Tools started [Shizuku](https://github.com/RikkaApps/Shizuku) for this
   instead; it no longer needs or starts Shizuku.
+- **Its own Recent apps screen (1.14).** Swipe up and pause opens Box Tools' Recent apps instead of Android's
+  (which the vendor launcher draws). Tap a card to switch, drag it up or tap ✕ to close it, Clear all, Back to
+  leave. It's built for speed: an overlay created once and only made visible; the list is refreshed from
+  `dumpsys activity recents` when your finger touches the bottom edge, before the pause; the app you leave is
+  screenshotted then (accessibility screenshot, cropped to its window); apps with no screenshot yet get
+  Android's own task snapshots once in the background.
+- **Replaces the vendor launcher (1.15, `launcher3-stub/`).** The MMB firmware reinstalls and re-enables its
+  launcher (`com.android.launcher3`) at every boot, so it can't be removed or kept disabled. But it's signed
+  with the public AOSP test platform key, so `launcher3-stub/` (built with its own `build.sh`, signed with that
+  key) installs as an update to it: no services, not a home screen, and its one screen sends anything that
+  opens the launcher by name to the real home screen. The firmware keeps the update across boots, and nothing
+  starts the launcher any more. Undo: `adb uninstall com.android.launcher3`. As a fallback, if the stock
+  launcher is ever back, Box Tools switches it off after boot, takes back its runtime permissions, and keeps
+  the chosen home screen.
 - **Makes sure touch works after boot (1.13).** On the MMB box, SurfaceFlinger sometimes never gets
   Android's "boot finished" call (seen with a trampoline home screen). Until it does, it never gives the input
   system its window list: the screen draws, but every touch is dropped. After each boot Box Tools waits 1 second

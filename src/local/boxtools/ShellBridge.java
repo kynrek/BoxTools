@@ -123,7 +123,10 @@ final class ShellBridge {
                         }
                         startRadio(app);
                         HomeKeeper.rememberInBackground(app);
-                        new Thread(() -> ensureTouch(app), "touch-check").start();
+                        new Thread(() -> {
+                            ensureTouch(app);   // waits for sys.boot_completed
+                            VendorLauncher.switchOff(app);
+                        }, "after-boot").start();
                         return;
                     } catch (LocalAdb.Unauthorized e) {
                         Log.w(TAG, "USB debugging wasn't allowed for Box Tools; MiniCarHome can't resize windows");
