@@ -37,6 +37,11 @@ also works on its own with any launcher.
   calls it through a content provider (`local.boxtools.shell`) that only apps holding the permission
   below can use. Before 1.9, Box Tools started [Shizuku](https://github.com/RikkaApps/Shizuku) for this
   instead; it no longer needs or starts Shizuku.
+- **Makes sure touch works after boot (1.13).** On the MMB box, SurfaceFlinger sometimes never gets
+  Android's "boot finished" call (seen with a trampoline home screen). Until it does, it never gives the input
+  system its window list: the screen draws, but every touch is dropped. After each boot Box Tools waits 1 second
+  past `sys.boot_completed`, and if no window can take touches it sends SurfaceFlinger that call itself
+  (`service call SurfaceFlinger 1`; harmless when it already had it).
 - **Keeps the home screen after updates (1.11).** Updating the app that's the home screen makes Android
   forget the choice and fall back to another home app. Box Tools remembers the home screen (at boot and on
   each Home swipe) and, when that app is updated, sets it back over the box's own ADB, then goes Home if

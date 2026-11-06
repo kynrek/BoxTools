@@ -14,7 +14,10 @@ final class ShellBridge {
     private static final long AUTH_WAIT_MS = 2 * 60_000;   // time to answer "Allow USB debugging?"
     private static final long CALL_AUTH_WAIT_MS = 5000;    // a call shouldn't hang on that prompt
     private static final long WARM_UP_GIVE_UP_MS = 3 * 60_000;   // adbd may not be listening yet right after boot
-    private static final long WARM_UP_RETRY_MS = 5000;
+    private static final long WARM_UP_RETRY_MS = 1000;   // adbd starts ~at boot_completed; the radio waits on this
+    private static final long BOOT_WAIT_MS = 2 * 60_000;   // touch check: wait for sys.boot_completed at most this
+    private static final long TOUCH_GRACE_MS = 1000;        // then give the windows this long to appear on their own
+                                                            // (on a good boot they are there at once; an extra call is harmless)
 
     private static LocalAdb adb;
     private static boolean warming;
@@ -61,6 +64,40 @@ final class ShellBridge {
         }
     }
 
+    /**
+     * Make sure touch works after boot. On the MMB box, SurfaceFlinger sometimes never gets the window manager's
+     * "boot finished" call (seen on every boot on 2026-11-06, with MiniMap as the home screen; it didn't log
+     * "Boot is finished"). Until it does, it never sends the window list to the input dispatcher: the screen
+     * draws, but every touch is dropped ("no touchable window"). Sending BOOT_FINISHED (transaction 1) ourselves
+     * fixes it; if it already had it, SurfaceFlinger just logs "Extra call to bootFinished".
+     */
+    private static void ensureTouch(Context c) {
+        try {
+            long until = SystemClock.elapsedRealtime() + BOOT_WAIT_MS;   // first, for Android to finish booting
+            while (!exec(c, "getprop sys.boot_completed", 5000).trim().equals("1")) {
+                if (SystemClock.elapsedRealtime() > until) return;
+                SystemClock.sleep(1000);
+            }
+            until = SystemClock.elapsedRealtime() + TOUCH_GRACE_MS;   // then a moment for windows on their own
+            while (SystemClock.elapsedRealtime() < until) {
+                if (inputHasDisplay(c)) return;
+                SystemClock.sleep(1000);
+            }
+            if (inputHasDisplay(c)) return;
+            Log.w(TAG, "no touchable windows after boot; telling SurfaceFlinger the boot finished");
+            exec(c, "service call SurfaceFlinger 1", 5000);
+            SystemClock.sleep(1000);
+            Log.i(TAG, "touch " + (inputHasDisplay(c) ? "restored" : "still not working"));
+        } catch (Exception e) {
+            Log.w(TAG, "touch check failed", e);
+        }
+    }
+
+    /** Whether the input dispatcher has any display with windows ("  Display: 0" in dumpsys input). */
+    private static boolean inputHasDisplay(Context c) throws Exception {
+        return exec(c, "dumpsys input | grep -c '^  Display: '", 10_000).trim().matches("[1-9][0-9]*");
+    }
+
     private static void drop() {
         if (adb != null) adb.close();
         adb = null;
@@ -86,6 +123,7 @@ final class ShellBridge {
                         }
                         startRadio(app);
                         HomeKeeper.rememberInBackground(app);
+                        new Thread(() -> ensureTouch(app), "touch-check").start();
                         return;
                     } catch (LocalAdb.Unauthorized e) {
                         Log.w(TAG, "USB debugging wasn't allowed for Box Tools; MiniCarHome can't resize windows");
