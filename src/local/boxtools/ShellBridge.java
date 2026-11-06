@@ -45,6 +45,22 @@ final class ShellBridge {
                 15_000).trim();
     }
 
+    /**
+     * Start the cellular radio. The MMB firmware starts its radio daemon (qcrild, through init.class_main.sh)
+     * only when sys.qcom.main.start is 1, which it sets only in its car modes (CarPlay, Android Auto, reverse
+     * camera). Otherwise there's no LTE, and Android's phone service waits for the radio forever, freezing and
+     * restarting about once a minute.
+     */
+    private static void startRadio(Context c) {
+        try {
+            String out = exec(c, "[ \"$(getprop sys.qcom.main.start)\" = 1 ] && echo on"
+                    + " || { setprop sys.qcom.main.start 1 && echo started; }", 10_000).trim();
+            if (!out.equals("on")) Log.i(TAG, "cellular radio: " + out);
+        } catch (Exception e) {
+            Log.w(TAG, "couldn't start the cellular radio", e);
+        }
+    }
+
     private static void drop() {
         if (adb != null) adb.close();
         adb = null;
@@ -53,6 +69,7 @@ final class ShellBridge {
     /**
      * Connect once in the background after boot, so the box's "Allow USB debugging?" prompt (only ever shown the
      * first time) comes up then rather than in the middle of a drive, and the first window change is quick.
+     * Then start the cellular radio (see startRadio).
      */
     static synchronized void warmUpInBackground(Context c) {
         if (warming) return;
@@ -67,6 +84,7 @@ final class ShellBridge {
                         synchronized (ShellBridge.class) {
                             if (adb == null) adb = fresh; else fresh.close();
                         }
+                        startRadio(app);
                         return;
                     } catch (LocalAdb.Unauthorized e) {
                         Log.w(TAG, "USB debugging wasn't allowed for Box Tools; MiniCarHome can't resize windows");

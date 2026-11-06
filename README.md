@@ -37,6 +37,11 @@ also works on its own with any launcher.
   calls it through a content provider (`local.boxtools.shell`) that only apps holding the permission
   below can use. Before 1.9, Box Tools started [Shizuku](https://github.com/RikkaApps/Shizuku) for this
   instead; it no longer needs or starts Shizuku.
+- **Turns on the cellular radio at boot (1.10).** The MMB firmware starts its radio daemon only in its car
+  modes (CarPlay, Android Auto, reverse camera), by setting `sys.qcom.main.start` to 1. Otherwise there's
+  no LTE, and Android's phone service waits for the radio forever, freezing and restarting about once a
+  minute. Over the same ADB connection, Box Tools sets that property after every boot. The firmware's
+  LED script reads it as its "work" mode.
 - **Window closing for MiniCarHome.** Android won't let one app resize another app's open window. When
   MiniCarHome changes its panel width or side, it asks Box Tools to tap the old window's close
   button, then reopens the app at the new size. This and window control use a signature
