@@ -64,6 +64,13 @@ public class NavGestureService extends AccessibilityService {
         }
     };
 
+    // An app was updated: if it's the home screen, HomeKeeper sets it back (Android forgets the choice).
+    private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent i) {
+            if (i.getData() != null) HomeKeeper.onPackageReplaced(c, i.getData().getSchemeSpecificPart());
+        }
+    };
+
     private void tap(float x, float y) {
         Path p = new Path();
         p.moveTo(x, y);
@@ -77,6 +84,9 @@ public class NavGestureService extends AccessibilityService {
         ShellBridge.warmUpInBackground(this);   // this service starts with every boot
         registerReceiver(closeReceiver, new IntentFilter(ACTION_CLOSE_WINDOW), "local.boxtools.permission.CONTROL", null,
                 Context.RECEIVER_EXPORTED);
+        IntentFilter replaced = new IntentFilter(Intent.ACTION_PACKAGE_REPLACED);
+        replaced.addDataScheme("package");
+        registerReceiver(packageReceiver, replaced);
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
         DisplayMetrics dm = getResources().getDisplayMetrics();
         int edge = Math.round(EDGE_DP * dm.density);
@@ -131,6 +141,7 @@ public class NavGestureService extends AccessibilityService {
                         if (edge == Edge.BOTTOM) {
                             boolean paused = SystemClock.uptimeMillis() - holdSince >= HOLD_MS;
                             performGlobalAction(paused ? GLOBAL_ACTION_RECENTS : GLOBAL_ACTION_HOME);
+                            if (!paused) HomeKeeper.rememberInBackground(NavGestureService.this);
                         } else {
                             performGlobalAction(GLOBAL_ACTION_BACK);
                         }
@@ -160,6 +171,7 @@ public class NavGestureService extends AccessibilityService {
     public void onDestroy() {
         CarAudioKeepAwake.stop();
         try { unregisterReceiver(closeReceiver); } catch (RuntimeException ignored) { }
+        try { unregisterReceiver(packageReceiver); } catch (RuntimeException ignored) { }
         for (View v : strips) {
             if (v != null) try { wm.removeView(v); } catch (RuntimeException ignored) { }
         }

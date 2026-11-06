@@ -85,6 +85,7 @@ final class ShellBridge {
                             if (adb == null) adb = fresh; else fresh.close();
                         }
                         startRadio(app);
+                        HomeKeeper.rememberInBackground(app);
                         return;
                     } catch (LocalAdb.Unauthorized e) {
                         Log.w(TAG, "USB debugging wasn't allowed for Box Tools; MiniCarHome can't resize windows");

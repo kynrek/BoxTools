@@ -37,6 +37,10 @@ also works on its own with any launcher.
   calls it through a content provider (`local.boxtools.shell`) that only apps holding the permission
   below can use. Before 1.9, Box Tools started [Shizuku](https://github.com/RikkaApps/Shizuku) for this
   instead; it no longer needs or starts Shizuku.
+- **Keeps the home screen after updates (1.11).** Updating the app that's the home screen makes Android
+  forget the choice and fall back to another home app. Box Tools remembers the home screen (at boot and on
+  each Home swipe) and, when that app is updated, sets it back over the box's own ADB, then goes Home if
+  another home app came up meanwhile.
 - **Turns on the cellular radio at boot (1.10).** The MMB firmware starts its radio daemon only in its car
   modes (CarPlay, Android Auto, reverse camera), by setting `sys.qcom.main.start` to 1. Otherwise there's
   no LTE, and Android's phone service waits for the radio forever, freezing and restarting about once a
