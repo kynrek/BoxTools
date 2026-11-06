@@ -27,7 +27,7 @@ also works on its own with any launcher.
   and shows nothing as playing. The **Car Audio Awake** icon switches it off and on; if the car won't go
   back to its own radio while it's on, switch it off.
 - **Stock Home icon.** Opens the box's original launcher, even while another app is the default home.
-- **Window control for MiniCarHome.** Only the shell user (what ADB runs as) can see and arrange other
+- **Window control for MiniCarHome (and MiniMap, 1.12).** Only the shell user (what ADB runs as) can see and arrange other
   apps' windows. The MMB box's firmware keeps ADB listening on port 5555 on the box itself, with or
   without Wi-Fi, so Box Tools connects there with its own ADB key, as a computer would, and runs
   MiniCarHome's window commands (`am stack list`, `dumpsys activity activities`, and its own
@@ -49,7 +49,9 @@ also works on its own with any launcher.
 - **Window closing for MiniCarHome.** Android won't let one app resize another app's open window. When
   MiniCarHome changes its panel width or side, it asks Box Tools to tap the old window's close
   button, then reopens the app at the new size. This and window control use a signature
-  permission (`local.boxtools.permission.CONTROL`), so only apps signed with the same key can ask.
+  permission (`local.boxtools.permission.CONTROL`), so only apps signed with the same key can ask, plus
+  (1.12) MiniMap, a navigation-app home screen with its own signing key, whose certificate is listed in
+  `res/values/arrays.xml` (`knownSigner`).
 
 The accessibility service doesn't read what's on screen: it uses the window list only to find the
 window it's asked to close.

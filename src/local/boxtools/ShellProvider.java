@@ -10,7 +10,8 @@ import android.os.Bundle;
 import android.util.Log;
 
 /**
- * Lets MiniCarHome (signed with the same key, so it holds {@code local.boxtools.permission.CONTROL}) run commands
+ * Lets MiniCarHome (signed with the same key) and MiniMap (its certificate is in res/values/arrays.xml), which
+ * hold {@code local.boxtools.permission.CONTROL}, run commands
  * as the shell user, to see and arrange other apps' windows, which Android otherwise doesn't allow an app.
  * Called with {@code ContentResolver.call(content://local.boxtools.shell, method, arg, extras)}; calls block,
  * so make them off the main thread.

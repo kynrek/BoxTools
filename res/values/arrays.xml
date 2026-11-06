@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Signing certificates (SHA-256) also given CONTROL: MiniMap, com.kynrek.osmandbox (github.com/kynrek/MiniMap). -->
+    <string-array name="known_certs">
+        <item>3465867d3403deb7a32472c8cee2acb8f8a876d5ffaccfcde51f2829bb6d03c7</item>
+    </string-array>
+</resources>

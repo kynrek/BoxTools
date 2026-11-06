@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="local.boxtools"
-    android:versionCode="12"
-    android:versionName="1.11">
+    android:versionCode="13"
+    android:versionName="1.12">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
 
-    <!-- Lets MiniCarHome (same signing key) close an app window through the gesture service, and arrange windows
-         through ShellProvider. -->
-    <permission android:name="local.boxtools.permission.CONTROL" android:protectionLevel="signature" />
+    <!-- Lets MiniCarHome (same signing key) close an app window through the gesture service, and lets MiniCarHome
+         and MiniMap (com.kynrek.osmandbox, its own key, listed in known_certs) arrange windows through ShellProvider. -->
+    <permission android:name="local.boxtools.permission.CONTROL"
+        android:protectionLevel="signature|knownSigner"
+        android:knownCerts="@array/known_certs" />
 
     <!-- Not grantable at install; granted once over ADB: pm grant local.boxtools android.permission.WRITE_SECURE_SETTINGS -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
@@ -63,7 +65,7 @@
             </intent-filter>
         </activity>
 
-        <!-- MiniCarHome's window handling: runs commands as the shell user. call() checks for CONTROL itself. -->
+        <!-- MiniCarHome's and MiniMap's window handling: runs commands as the shell user. call() checks for CONTROL itself. -->
         <provider android:name=".ShellProvider"
             android:authorities="local.boxtools.shell"
             android:permission="local.boxtools.permission.CONTROL"
