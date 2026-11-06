@@ -27,15 +27,19 @@ also works on its own with any launcher.
   and shows nothing as playing. The **Car Audio Awake** icon switches it off and on; if the car won't go
   back to its own radio while it's on, switch it off.
 - **Stock Home icon.** Opens the box's original launcher, even while another app is the default home.
-- **Starts Shizuku after every boot.** [Shizuku](https://github.com/RikkaApps/Shizuku) stops when the box
-  reboots, and its own start-on-boot needs Wireless debugging, which needs Wi-Fi the box often doesn't
-  have in the car. The MMB box's firmware keeps ADB listening on port 5555 on the box itself, so Box
-  Tools connects there with its own ADB key and runs Shizuku's starter, as a computer would. It leaves
-  Shizuku alone if it's already running. The first connection makes Android ask to allow USB debugging
-  (the MMB box answers that by itself). Nothing happens if Shizuku isn't installed.
+- **Window control for MiniCarHome.** Only the shell user (what ADB runs as) can see and arrange other
+  apps' windows. The MMB box's firmware keeps ADB listening on port 5555 on the box itself, with or
+  without Wi-Fi, so Box Tools connects there with its own ADB key, as a computer would, and runs
+  MiniCarHome's window commands (`am stack list`, `dumpsys activity activities`, and its own
+  `TaskWindow` helper, run with `app_process` from Box Tools' APK, to switch a window between freeform
+  and multi-window or close a task). It keeps that connection open and connects once at boot. The first
+  connection makes Android ask to allow USB debugging (the MMB box answers that by itself). MiniCarHome
+  calls it through a content provider (`local.boxtools.shell`) that only apps holding the permission
+  below can use. Before 1.9, Box Tools started [Shizuku](https://github.com/RikkaApps/Shizuku) for this
+  instead; it no longer needs or starts Shizuku.
 - **Window closing for MiniCarHome.** Android won't let one app resize another app's open window. When
   MiniCarHome changes its panel width or side, it asks Box Tools to tap the old window's close
-  button, then reopens the app at the new size. This uses a signature
+  button, then reopens the app at the new size. This and window control use a signature
   permission (`local.boxtools.permission.CONTROL`), so only apps signed with the same key can ask.
 
 The accessibility service doesn't read what's on screen: it uses the window list only to find the
@@ -43,7 +47,7 @@ window it's asked to close.
 
 **Note on the MMB box's ADB:** its firmware keeps ADB open on port 5555 and approves new debugging keys
 without asking, so any app on the box, or any device on the same Wi-Fi network, can get adb-level access.
-That was true before Box Tools; the Shizuku start relies on it.
+That was true before Box Tools; window control relies on it.
 
 ## Install
 

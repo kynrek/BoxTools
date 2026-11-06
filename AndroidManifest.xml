@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="local.boxtools"
-    android:versionCode="9"
-    android:versionName="1.8">
+    android:versionCode="10"
+    android:versionName="1.9">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
 
-    <!-- Lets MiniCarHome (same signing key) ask the gesture service to close an app window, e.g. before resizing it. -->
+    <!-- Lets MiniCarHome (same signing key) close an app window through the gesture service, and arrange windows
+         through ShellProvider. -->
     <permission android:name="local.boxtools.permission.CONTROL" android:protectionLevel="signature" />
 
     <!-- Not grantable at install; granted once over ADB: pm grant local.boxtools android.permission.WRITE_SECURE_SETTINGS -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <!-- Starting Shizuku through the box's own adbd on 127.0.0.1:5555 (see ShizukuStarter). -->
+    <!-- Shell commands for MiniCarHome through the box's own adbd on 127.0.0.1:5555 (see ShellBridge). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <queries>
-        <package android:name="moe.shizuku.privileged.api" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
@@ -62,6 +62,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- MiniCarHome's window handling: runs commands as the shell user. call() checks for CONTROL itself. -->
+        <provider android:name=".ShellProvider"
+            android:authorities="local.boxtools.shell"
+            android:permission="local.boxtools.permission.CONTROL"
+            android:exported="true" />
 
         <!-- Enabled over ADB: settings put secure enabled_accessibility_services local.boxtools/.NavGestureService -->
         <service android:name=".NavGestureService"

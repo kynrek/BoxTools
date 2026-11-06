@@ -26,7 +26,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
 /**
- * Just enough of the ADB protocol to run one shell command through the box's own adbd, which this firmware
+ * Just enough of the ADB protocol to run shell commands, one at a time, through the box's own adbd, which this firmware
  * keeps listening on TCP port 5555 whether or not there's Wi-Fi. The first connection makes Android ask
  * "Allow USB debugging?" on screen; with "Always allow" ticked, later ones go straight through.
  */
@@ -47,6 +47,7 @@ final class LocalAdb {
     private DataInputStream in;
     private OutputStream out;
     private int remoteMax = 4096;
+    private int lastLocalId;
 
     private LocalAdb() { }
 
@@ -104,10 +105,12 @@ final class LocalAdb {
 
     /**
      * Run a shell command and return its output. Uses "exec:", not "shell:": the plain shell service runs the
-     * command on a terminal, and closing it at hang-up killed the Shizuku server the command had just started.
+     * command on a terminal, and closing it at hang-up killed any server the command had just started.
      */
     String exec(String command, long timeoutMs) throws IOException {
-        int local = 1;
+        // A new stream id each time: the connection is kept for many commands (ShellBridge), and a late message
+        // for an earlier stream mustn't end this one.
+        int local = ++lastLocalId;
         send(OPEN, local, 0, ("exec:" + command + "\0").getBytes(StandardCharsets.UTF_8));
         socket.setSoTimeout((int) timeoutMs);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
