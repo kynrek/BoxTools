@@ -129,6 +129,33 @@ final class ShellBridge {
         }
     }
 
+    /**
+     * Keep every app ahead-of-time compiled for speed. Out of the box most apps run as "verify" (interpreted/JIT)
+     * or "speed-profile" (only the hot parts compiled): on this slow SoC that made MiniMap's search 3-5x slower.
+     * The compile mode per reason is a pm.dexopt.* property, reset at every boot, so: set the reasons used by
+     * installs, updates and Android's background/idle compiling to speed ("inactive" too, which otherwise
+     * downgrades apps not used for a while), then, 3 minutes after boot, compile anything not yet at speed.
+     * Without -f an app already at speed is skipped in a moment, so after the first full pass a boot costs ~1 s
+     * per app checked. Runs detached (setsid/nohup) so it survives this shell. Box Tools itself is never touched.
+     * Log: /data/local/tmp/boxtools-compile.log
+     */
+    private static void keepAppsCompiled(Context c) {
+        try {
+            exec(c, "for r in install install-bulk install-fast bg-dexopt inactive cmdline; do"
+                    + " setprop pm.dexopt.$r speed; done", 6000);
+            String script = "sleep 180; echo \"start $(date)\";"
+                    + " for p in $(pm list packages | cut -d: -f2); do"
+                    + "  [ \"$p\" = " + c.getPackageName() + " ] && continue;"
+                    + "  cmd package compile -m speed \"$p\" >/dev/null 2>&1 || echo \"failed $p\";"
+                    + " done; echo \"done $(date)\"";
+            exec(c, "setsid nohup sh -c " + quote(script)
+                    + " > /data/local/tmp/boxtools-compile.log 2>&1 < /dev/null &", 6000);
+            Log.i(TAG, "apps: compile mode speed; background compile starts in 3 min");
+        } catch (Exception e) {
+            Log.w(TAG, "keepAppsCompiled failed", e);
+        }
+    }
+
     private static String quote(String s) {
         return "'" + s.replace("'", "'\\''") + "'";
     }
@@ -167,6 +194,7 @@ final class ShellBridge {
                             ensureTouch(app);   // waits for sys.boot_completed
                             VendorLauncher.switchOff(app);
                             recoverWifi(app);
+                            keepAppsCompiled(app);
                         }, "after-boot").start();
                         return;
                     } catch (LocalAdb.Unauthorized e) {
