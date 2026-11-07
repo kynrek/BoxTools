@@ -93,6 +93,46 @@ final class ShellBridge {
         }
     }
 
+    /**
+     * If the box isn't on Wi-Fi and a {@code boxtools_wifi.txt} file (SSID on line 1, password on line 2) sits in
+     * the root of a mounted SD card, join that network. For recovery when the box can't be reached otherwise; the
+     * file holds the password, so nothing secret lives in the app or the repo. Harmless when there's no file.
+     */
+    private static void recoverWifi(Context c) {
+        try {
+            // Credentials: remembered in the app the first time, else read from boxtools_wifi.txt on an SD card
+            // (and then remembered). So the box rejoins Wi-Fi on every boot with no card after the first recovery.
+            android.content.SharedPreferences prefs = c.getSharedPreferences("boxtools", Context.MODE_PRIVATE);
+            String ssid = prefs.getString("wifi_ssid", null), pass = prefs.getString("wifi_pass", null);
+            if (ssid == null) {
+                String file = exec(c, "ls /mnt/media_rw/*/boxtools_wifi.txt 2>/dev/null | head -1", 6000).trim();
+                if (file.isEmpty()) return;
+                String[] lines = exec(c, "cat " + file, 6000).replace("\r", "").split("\n");
+                if (lines.length < 2 || lines[0].trim().isEmpty()) return;
+                ssid = lines[0].trim();
+                pass = lines[1];
+                prefs.edit().putString("wifi_ssid", ssid).putString("wifi_pass", pass).apply();
+                Log.i(TAG, "remembered Wi-Fi " + ssid + " for future boots");
+            }
+            // Join if not already on that network. Retry a few times for a weak signal.
+            exec(c, "svc wifi enable", 8000);
+            for (int attempt = 0; attempt < 4; attempt++) {
+                String status = exec(c, "cmd wifi status 2>/dev/null | head -1", 6000);
+                if (status.contains("\"" + ssid + "\"") || status.toLowerCase().contains("connected to " + ssid.toLowerCase()))
+                    return;
+                String out = exec(c, "cmd wifi connect-network " + quote(ssid) + " wpa2 " + quote(pass), 20_000);
+                Log.i(TAG, "recoverWifi " + ssid + " (try " + (attempt + 1) + "): " + out.trim());
+                SystemClock.sleep(5000);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "recoverWifi failed", e);
+        }
+    }
+
+    private static String quote(String s) {
+        return "'" + s.replace("'", "'\\''") + "'";
+    }
+
     /** Whether the input dispatcher has any display with windows ("  Display: 0" in dumpsys input). */
     private static boolean inputHasDisplay(Context c) throws Exception {
         return exec(c, "dumpsys input | grep -c '^  Display: '", 10_000).trim().matches("[1-9][0-9]*");
@@ -126,6 +166,7 @@ final class ShellBridge {
                         new Thread(() -> {
                             ensureTouch(app);   // waits for sys.boot_completed
                             VendorLauncher.switchOff(app);
+                            recoverWifi(app);
                         }, "after-boot").start();
                         return;
                     } catch (LocalAdb.Unauthorized e) {

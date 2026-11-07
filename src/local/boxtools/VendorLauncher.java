@@ -5,7 +5,8 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 /**
- * Switches the MMB box's vendor launcher (com.android.launcher3) off after every boot. It can't be removed: the
+ * Switches the MMB box's vendor floating ball, and the vendor launcher (com.android.launcher3) when our stand-in
+ * isn't installed over it, off after every boot. It can't be removed: the
  * firmware's TinkerInstall reinstalls and re-enables it while Android starts. Once Android has finished booting,
  * Box Tools disables it again (its process stops until the next boot), takes back runtime permissions it has no
  * use for here, and makes sure the remembered home screen is still the default. Box Tools draws Recent apps itself
@@ -33,6 +34,7 @@ final class VendorLauncher {
         try {
             // Our stand-in (launcher3-stub/, signed with the same public AOSP key) replaces it as an update; then
             // there's nothing to switch off. This is the fallback if the firmware puts the stock one back.
+            switchOffFloatingBall(c);
             String version = ShellBridge.exec(c, "dumpsys package " + PKG + " | grep -m1 versionName", 5000);
             if (version.contains("stub")) {
                 keepHome(c);
@@ -49,6 +51,19 @@ final class VendorLauncher {
             keepHome(c);
         } catch (Exception e) {
             Log.w(TAG, "couldn't switch the vendor launcher off", e);
+        }
+    }
+
+    /**
+     * The vendor floating ball (com.applepie.floatingball): a persistent system app the firmware re-enables at
+     * every boot, so it can't be kept from starting; Box Tools' edge swipes replace it. Switch it off again.
+     * Undo for a boot: {@code adb shell pm enable com.applepie.floatingball}.
+     */
+    private static void switchOffFloatingBall(Context c) throws Exception {
+        String ball = "com.applepie.floatingball";
+        if (ShellBridge.exec(c, "pm list packages -e " + ball, 5000).contains("package:" + ball)) {
+            Log.i(TAG, "floating ball: " + ShellBridge.exec(c, "pm disable-user --user 0 " + ball
+                    + " && am force-stop " + ball, 10_000).trim());   // a persistent app keeps running when disabled
         }
     }
 
