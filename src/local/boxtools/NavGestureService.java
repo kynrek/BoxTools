@@ -83,8 +83,9 @@ public class NavGestureService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         CarAudioKeepAwake.startIfEnabled(this);   // runs from boot with this service
-        enableWirelessDebugging();   // before the warm-up: on this firmware adbd only listens on :5555 with it
-        requestLocalAdb();           // make the firmware bring adbd up on 127.0.0.1:5555 (wifi_adb.sh)
+        AdbSwitch.request(this, "accessibility service");   // adbd on :5555 + Wireless debugging (see AdbSwitch)
+        AdbSwitch.keepUsbDebuggingOn(this);   // the root cause: see AdbSwitch.keepUsbDebuggingOn
+        AdbSwitch.startWatch();   // and keep it up (see AdbSwitch.startWatch)
         ShellBridge.warmUpInBackground(this);   // this service starts with every boot
         registerReceiver(closeReceiver, new IntentFilter(ACTION_CLOSE_WINDOW), "local.boxtools.permission.CONTROL", null,
                 Context.RECEIVER_EXPORTED);
@@ -98,41 +99,6 @@ public class NavGestureService extends AccessibilityService {
         strips[0] = addStrip(Gravity.START | Gravity.CENTER_VERTICAL, edge, WindowManager.LayoutParams.MATCH_PARENT, Edge.LEFT);
         strips[1] = addStrip(Gravity.END | Gravity.CENTER_VERTICAL, edge, WindowManager.LayoutParams.MATCH_PARENT, Edge.RIGHT);
         strips[2] = addStrip(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, WindowManager.LayoutParams.MATCH_PARENT, edge, Edge.BOTTOM);
-    }
-
-    /**
-     * Android turns Wireless debugging off at every boot, and on the MMB firmware adbd listens on 127.0.0.1:5555
-     * (which Box Tools uses for the touch fix, the cellular radio and window control) only while it's on. Shizuku's
-     * start-on-boot used to switch it on; without that, nothing works after a reboot. Box Tools holds
-     * WRITE_SECURE_SETTINGS, so it switches it on itself.
-     */
-    /**
-     * On the MMB firmware adbd listens on 127.0.0.1:5555 (Box Tools' own channel) only once
-     * {@code sys.setadb.mode=1} is set, which makes init run wifi_adb.sh as root (sets service.adb.tcp.port 5555
-     * and restarts adbd). Something external used to set this each boot; Box Tools now sets it itself so its
-     * local ADB, and therefore the touch fix, the radio and window control, always come up.
-     */
-    private void requestLocalAdb() {
-        try {
-            Class<?> sp = Class.forName("android.os.SystemProperties");
-            if (!"5555".equals(sp.getMethod("get", String.class).invoke(null, "service.adb.tcp.port"))) {
-                sp.getMethod("set", String.class, String.class).invoke(null, "sys.setadb.mode", "1");
-                Log.i(TAG, "requested adbd on :5555 (sys.setadb.mode=1)");
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "couldn't request local adb", t);
-        }
-    }
-
-    private void enableWirelessDebugging() {
-        try {
-            if (android.provider.Settings.Global.getInt(getContentResolver(), "adb_wifi_enabled", 0) != 1) {
-                android.provider.Settings.Global.putInt(getContentResolver(), "adb_wifi_enabled", 1);
-                Log.i(TAG, "switched Wireless debugging on");
-            }
-        } catch (RuntimeException e) {
-            Log.w(TAG, "couldn't switch Wireless debugging on", e);
-        }
     }
 
     private enum Edge { LEFT, RIGHT, BOTTOM }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="local.boxtools"
-    android:versionCode="20"
-    android:versionName="1.19">
+    android:versionCode="25"
+    android:versionName="1.23">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
 
@@ -15,6 +15,7 @@
     <!-- Not grantable at install; granted once over ADB: pm grant local.boxtools android.permission.WRITE_SECURE_SETTINGS -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Shell commands for MiniCarHome through the box's own adbd on 127.0.0.1:5555 (see ShellBridge). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -75,6 +76,16 @@
             android:authorities="local.boxtools.shell"
             android:permission="local.boxtools.permission.CONTROL"
             android:exported="true" />
+
+        <!-- At every boot, independent of the accessibility service: ADB on, and the service back on after a crash. -->
+        <receiver android:name=".BootReceiver"
+            android:directBootAware="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Enabled over ADB: settings put secure enabled_accessibility_services local.boxtools/.NavGestureService -->
         <service android:name=".NavGestureService"

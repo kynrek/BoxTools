@@ -114,19 +114,51 @@ final class ShellBridge {
                 prefs.edit().putString("wifi_ssid", ssid).putString("wifi_pass", pass).apply();
                 Log.i(TAG, "remembered Wi-Fi " + ssid + " for future boots");
             }
-            // Join if not already on that network. Retry a few times for a weak signal.
+            // Join only if the box isn't on any Wi-Fi network: one it joined itself (home, phone hotspot) stays.
+            // (Up to 1.19 this read only the first line of "cmd wifi status", "Wifi is enabled", so it never saw
+            // a connection and switched the box to the remembered network at every boot.) Retry for a weak signal.
             exec(c, "svc wifi enable", 8000);
             for (int attempt = 0; attempt < 4; attempt++) {
-                String status = exec(c, "cmd wifi status 2>/dev/null | head -1", 6000);
-                if (status.contains("\"" + ssid + "\"") || status.toLowerCase().contains("connected to " + ssid.toLowerCase()))
+                if (attempt == 0) SystemClock.sleep(15_000);   // give Android's own auto-join a chance first
+                String status = exec(c, "cmd wifi status 2>/dev/null", 6000);
+                if (status.contains("Wifi is connected to")) {
+                    Log.i(TAG, "recoverWifi: already on Wi-Fi, " + firstLineWith(status, "connected to"));
                     return;
-                String out = exec(c, "cmd wifi connect-network " + quote(ssid) + " wpa2 " + quote(pass), 20_000);
+                }
+                String security = securityOf(c, ssid);
+                String out = exec(c, "cmd wifi connect-network " + quote(ssid) + " " + security + " " + quote(pass), 20_000);
                 Log.i(TAG, "recoverWifi " + ssid + " (try " + (attempt + 1) + "): " + out.trim());
                 SystemClock.sleep(5000);
             }
         } catch (Exception e) {
             Log.w(TAG, "recoverWifi failed", e);
         }
+    }
+
+    /**
+     * The security to join {@code ssid} with, from the last scan: "wpa3" for a WPA3-only (SAE) network, "wpa2"
+     * otherwise. Up to 1.20 this was always "wpa2", which can't join a WPA3-only network (home "ubiquity" is
+     * [WPA2-SAE+FT/SAE-CCMP]): the box left its working network for one it could never connect to.
+     */
+    private static String securityOf(Context c, String ssid) {
+        try {
+            String scan = exec(c, "cmd wifi list-scan-results 2>/dev/null", 8000);
+            boolean sae = false, psk = false;
+            for (String line : scan.split("\n")) {
+                String t = line.trim();
+                if (!(t.endsWith(" " + ssid) || t.contains(" " + ssid + " "))) continue;
+                if (t.contains("PSK")) psk = true;
+                if (t.contains("SAE")) sae = true;
+            }
+            return sae && !psk ? "wpa3" : "wpa2";
+        } catch (Exception e) {
+            return "wpa2";
+        }
+    }
+
+    private static String firstLineWith(String text, String part) {
+        for (String line : text.split("\n")) if (line.contains(part)) return line.trim();
+        return "";
     }
 
     /**
