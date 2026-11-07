@@ -38,6 +38,52 @@ Apple's AirPlay/CarPlay reference stack, branded **"Shark" / "SpeedPlay"** (`Sha
    "SharkCarPlay: tear down reboot android" and **reboots the whole box** to re-run the bring-up, rather than
    reconnecting in place. (This is the self-reboot we see when the box leaves the car's range.)
 
+## Switching the box to BMW mode: the `#135177` dial code
+The vendor's instructions for BMW cars: power the box, pair a phone with the Bluetooth device **"JoyeBox"**
+(ours advertises `JoyeBox-22015`), then **dial `#135177`** from the phone. The LED goes from steady white to
+**steady red** = the BMW-only connection protocol. Then delete the Bluetooth pairing records on both the phone
+and the car's infotainment system, and pair the box with the car again.
+
+How that works in the firmware (traced 2026-11-07 from the backup):
+
+1. **The dialed number reaches the box over Bluetooth hands-free.** The paired phone's outgoing call shows up
+   in the box's Bluetooth app (`com.applepie.bluetooth`; the active one is `/system/app/APMBluetooth`, v2.7.17)
+   as `BTPhoneManager.onPhoneOutgoing()`, which passes the number to
+   `com.applepie.bluetoothcall.util.PhoneOutgoUtil.process()`.
+2. **`PhoneOutgoUtil` matches service codes** and sets the property `sys.bt.call.cmd`:
+
+   | Dial | `sys.bt.call.cmd` | What `btcmd.sh` then does |
+   |---|---|---|
+   | `#135177` | `BM` | `BM` -> `/mnt/vendor/persist/btype.txt`, wireless mode (`CarPlayMode.txt` = 0), `simoem_led 2`, reboot |
+   | `#135178` | `HB` | `HB` -> `btype.txt`, wireless mode, `simoem_led 5`, reboot |
+   | `#135145` | `CP` | wired CarPlay (`CarPlayMode.txt` = 1), `simoem_led 4`, reboot. Only if `persist.sys.enable.multiconn=1` |
+   | `#135155` | `AA` | wired Android Auto (`CarPlayMode.txt` = 2), `simoem_led 6`, reboot. Only if multiconn is 1 |
+   | `#135199` | `cleangoc` | deletes `/data/goc6125/*` (the gocsdk Bluetooth pairing database), reboot |
+   | `#135189` | `recovery` | `reboot recovery`. **Don't**: boots the recovery partition |
+   | `#135166` | `savelog` | no handler in `btcmd.sh` on this firmware |
+   | `#135135` | none | APMBluetooth sends a reboot broadcast (the older XQBluetooth calls a reboot directly) |
+
+   All codes except recovery/cleangoc/savelog are ignored in Tesla mode (`persist.sys.oem.tesla=1`).
+   `persist.sys.enable.multiconn` is empty on our box, so the wired CP/AA codes do nothing here.
+3. **init runs `btcmd.sh`:** `init.rc` has `on property:sys.bt.call.cmd=*` -> `start btcmd`
+   (`/system/bin/btcmd.sh`, oneshot, as shell). It does the actions in the table, sets
+   `persist.sys.switch.mode=1`, syncs and reboots.
+4. **`simoem_led <n>`** doesn't drive the LED directly: it writes `[XQ_Config]@DeviceType=<n>@...` to the raw
+   `item` partition (`/dev/block/bootdevice/by-name/item`), and the LED colour follows that device type from
+   the next boot (2 = BM = red per the vendor; 5 = HB, 4 = wired CP, 6 = wired AA; we haven't seen those colours).
+5. **Next boot, `z-sender.sh`** reads `btype.txt` into `persist.sys.wlbt.type` (BM or HB). With no file it
+   defaults to **HB on "CV" builds** (`ro.build.btype.name=CV`, which ours is) and BM otherwise. In wireless
+   mode it starts `connect-ap.sh`, and for BM sets `sys.wl.bm=1` and `ro.build.bt.type=BM`, which selects the
+   BMW Bluetooth/CarPlay path (`gocsdk_wl`; HB uses `gocsdk_hb` and reports `ro.build.bt.type=Wireless`).
+
+**Why the pairing records must be deleted:** BM and HB use different Bluetooth engines and pairing databases, so a
+bond made in the other mode no longer matches; the car and phone must forget the old one and pair fresh.
+(`#135199` clears the box's own copy.)
+
+**Our box now (checked 2026-11-07):** `btype.txt` = BM, `persist.sys.wlbt.type=BM`, `ro.build.bt.type=BM`,
+`sys.wl.bm=1`, `persist.sys.mode.wired=0` (wireless), Bluetooth name `JoyeBox-22015`. So `#135177` has already
+been done; the box is in BMW wireless mode. Dialing it again only rewrites the same values and reboots.
+
 ## Why this matters for our setup
 - **Two Wi-Fi radios:** `wlan_usb0` (AIC8800 dongle) is the car link; `wlan0` is home Wi-Fi / our ADB. They're
   independent, so CarPlay and our remote access don't share a radio.
@@ -53,6 +99,7 @@ Apple's AirPlay/CarPlay reference stack, branded **"Shark" / "SpeedPlay"** (`Sha
 |---|---|---|
 | `z-sender.sh` | script | Boot orchestrator: mode, Apple serial, USB gadget, launch engine + connect-ap, button |
 | `connect-ap.sh` | script | Join the car's Wi-Fi AP on `wlan_usb0` |
+| `btcmd.sh` + `PhoneOutgoUtil` | script + app | `#1351xx` dial codes: BM/HB/wired mode switch, clear BT pairings |
 | `SharkCarPlay` + `libShark*/libAirPlay*` | native | CarPlay/AirPlay protocol engine |
 | `gocsdk*` | native | Bluetooth engine (pairing/SPP/HFP), provisions `.goc_database` |
 | `com.zjinnova.zlink` (MmbCarPlay.apk) | app | On-screen CarPlay UI |
@@ -73,8 +120,9 @@ CarPlay is iPhone-only by design. The sanctioned equivalent for an Android phone
 box already supports (mode 2, `MmbAuto.apk`, `gocsdk_aa`, `/data/gocAA/.goc_database`, `btlicenceAA.sh`).
 
 ## Not fully pinned (worth confirming on the live box later)
-- BM vs HB = which BT/Wi-Fi module variant (confirmed they pick `gocsdk_wl` vs `gocsdk_hb`; the vendor meaning
-  is a guess).
+- BM vs HB: the vendor calls BM "the connection protocol channel exclusive to BMW models"; HB is the generic
+  wireless path (default on CV builds). Switched with the `#135177` / `#135178` dial codes (see above). Which
+  part of the Bluetooth/CarPlay handshake differs between them is not traced.
 - Exactly which app issues the disconnect reboot (attributed to ZLink/TinkerCore from the log string).
 - Whether the phone-side CarPlay receiver is actually used, or the box just runs Android and bridges to the car.
 - `build.prop` wouldn't extract on macOS; some model details came from binary strings.
