@@ -134,26 +134,48 @@ final class ShellBridge {
      * or "speed-profile" (only the hot parts compiled): on this slow SoC that made MiniMap's search 3-5x slower.
      * The compile mode per reason is a pm.dexopt.* property, reset at every boot, so: set the reasons used by
      * installs, updates and Android's background/idle compiling to speed ("inactive" too, which otherwise
-     * downgrades apps not used for a while), then, 3 minutes after boot, compile anything not yet at speed.
-     * Without -f an app already at speed is skipped in a moment, so after the first full pass a boot costs ~1 s
-     * per app checked. Runs detached (setsid/nohup) so it survives this shell. Box Tools itself is never touched.
-     * Log: /data/local/tmp/boxtools-compile.log
+     * downgrades apps not used for a while), then, 3 minutes after boot, compile anything not yet at speed, one
+     * app at a time on this app's own thread and its own adb connection (a detached shell job didn't survive the
+     * exec stream closing; a private connection keeps window control free meanwhile). Without -f an app already
+     * at speed is skipped in a moment. Box Tools itself is never touched. Progress: logcat tag BoxTools.
      */
     private static void keepAppsCompiled(Context c) {
         try {
             exec(c, "for r in install install-bulk install-fast bg-dexopt inactive cmdline; do"
                     + " setprop pm.dexopt.$r speed; done", 6000);
-            String script = "sleep 180; echo \"start $(date)\";"
-                    + " for p in $(pm list packages | cut -d: -f2); do"
-                    + "  [ \"$p\" = " + c.getPackageName() + " ] && continue;"
-                    + "  cmd package compile -m speed \"$p\" >/dev/null 2>&1 || echo \"failed $p\";"
-                    + " done; echo \"done $(date)\"";
-            exec(c, "setsid nohup sh -c " + quote(script)
-                    + " > /data/local/tmp/boxtools-compile.log 2>&1 < /dev/null &", 6000);
-            Log.i(TAG, "apps: compile mode speed; background compile starts in 3 min");
         } catch (Exception e) {
-            Log.w(TAG, "keepAppsCompiled failed", e);
+            Log.w(TAG, "couldn't set the compile mode", e);
         }
+        Context app = c.getApplicationContext();
+        Thread t = new Thread(() -> {
+            SystemClock.sleep(3 * 60_000);
+            LocalAdb own = null;
+            try {
+                own = LocalAdb.connect(app, ADB_PORT, CALL_AUTH_WAIT_MS);
+                String[] pkgs = own.exec("pm list packages | cut -d: -f2", 30_000).trim().split("\\s+");
+                long start = SystemClock.elapsedRealtime();
+                int compiled = 0;
+                for (String p : pkgs) {
+                    if (p.isEmpty() || p.equals(app.getPackageName())) continue;
+                    long t0 = SystemClock.elapsedRealtime();
+                    String out = own.exec("cmd package compile -m speed " + p + " 2>&1", 20 * 60_000).trim();
+                    long ms = SystemClock.elapsedRealtime() - t0;
+                    if (ms > 2000 || !out.equals("Success")) {
+                        compiled++;
+                        Log.i(TAG, "compiled " + p + " in " + ms + " ms: " + out);
+                    }
+                }
+                Log.i(TAG, "apps: all at speed (" + pkgs.length + " checked, " + compiled + " compiled) in "
+                        + (SystemClock.elapsedRealtime() - start) / 1000 + " s");
+            } catch (Exception e) {
+                Log.w(TAG, "background compile stopped", e);
+            } finally {
+                if (own != null) own.close();
+            }
+        }, "compile-apps");
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.start();
+        Log.i(TAG, "apps: compile mode speed; background compile starts in 3 min");
     }
 
     private static String quote(String s) {
