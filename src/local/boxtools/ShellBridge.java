@@ -224,6 +224,39 @@ final class ShellBridge {
         adb = null;
     }
 
+    /** Waits until 20 s after boot, USB debugging is on, and a command runs over the local adb (2 min at most). */
+    private static void waitForAdbSettled(Context c) {
+        SystemClock.sleep(20_000);   // called just after sys.boot_completed (ensureTouch waits for it)
+        long until = SystemClock.elapsedRealtime() + 60_000;
+        while (SystemClock.elapsedRealtime() < until) {
+            try {
+                if (android.provider.Settings.Global.getInt(c.getContentResolver(),
+                        android.provider.Settings.Global.ADB_ENABLED, 0) == 1) break;
+            } catch (RuntimeException e) {
+                break;
+            }
+            SystemClock.sleep(2000);
+        }
+        waitUntilReachable(c, 60_000);
+    }
+
+    /** Waits (up to ms) until a command runs over the local adb. */
+    private static void waitUntilReachable(Context c, long ms) {
+        long until = SystemClock.elapsedRealtime() + ms;
+        while (true) {
+            try {
+                if (exec(c, "echo ok", 5000).contains("ok")) return;
+            } catch (Exception e) {
+                // adbd not back yet
+            }
+            if (SystemClock.elapsedRealtime() > until) {
+                Log.w(TAG, "after boot: local adb still not reachable, running the boot jobs anyway");
+                return;
+            }
+            SystemClock.sleep(3000);
+        }
+    }
+
     /**
      * Connect once in the background after boot, so the box's "Allow USB debugging?" prompt (only ever shown the
      * first time) comes up then rather than in the middle of a drive, and the first window change is quick.
@@ -247,6 +280,10 @@ final class ShellBridge {
                         new Thread(() -> {
                             ensureTouch(app);   // waits for sys.boot_completed
                             NoAutostart.watchInBackground(app);
+                            // adbd can go down for ~20 s just after boot: Android turns USB debugging off, and Box
+                            // Tools switches it back on only 10 s after boot (see AdbSwitch.keepUsbDebuggingOn).
+                            // The one-shot jobs need adb, so they wait until that's over.
+                            waitForAdbSettled(app);
                             VendorLauncher.switchOff(app);
                             recoverWifi(app);
                             keepAppsCompiled(app);

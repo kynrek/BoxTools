@@ -21,6 +21,11 @@ also works on its own with any launcher.
 - **Wireless Debug icon.** The box switches Wireless debugging off whenever it reboots, which happens
   often when its wireless CarPlay link drops. Tap this icon to turn it straight back on; it shows the
   box's IP address. Without the permission below it opens Developer options instead.
+- **Keeps ADB reachable (1.16, 1.23).** Box Tools brings up the firmware's adbd on port 5555 at every boot,
+  switches USB debugging back on when the firmware turns it off (with it off, Android stops adbd whenever
+  Wireless debugging goes off), and restarts adbd if it stops answering. Since 1.25 it waits until 10 seconds
+  after boot and coalesces changes before switching USB debugging back on: switching it twice in a fraction of
+  a second while the CarPlay firmware held the USB port crashed Android's system server (a soft reboot).
 - **Car audio kept awake (on by default).** Android puts an audio output to sleep after 3 seconds of
   silence, and waking it cut off the first half second of each navigation prompt. Box Tools plays
   inaudible noise (about -90 dB) into both speaker outputs so they never sleep. It holds no audio focus
@@ -57,7 +62,10 @@ also works on its own with any launcher.
   running with no window and nothing playing. Android then marks it "stopped", so it gets no boot broadcasts
   at later boots until it's opened again. Turning off the apps' boot receivers isn't enough: Audible's switches
   itself back on whenever the app runs, and the shell may not change another app's components. An app you
-  opened, or one that's playing (say the car resumed it), is left alone. The list is in `NoAutostart.java`.
+  opened, or one that's playing (say the car resumed it), is left alone. On this firmware the "stopped" mark alone
+  still let Audible start at boot, so (1.25) Box Tools also switches the listed apps' boot receivers off, after
+  a force-stop and every 10 minutes (Audible turns its own back on whenever it's opened). That needs the box's
+  adbd running as root, as it does on the MMB box. The list is in `NoAutostart.java`.
 - **Makes sure touch works after boot (1.13).** On the MMB box, SurfaceFlinger sometimes never gets
   Android's "boot finished" call (seen with a trampoline home screen). Until it does, it never gives the input
   system its window list: the screen draws, but every touch is dropped. After each boot Box Tools waits 1 second

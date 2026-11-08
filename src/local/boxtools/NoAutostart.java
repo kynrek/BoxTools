@@ -14,6 +14,8 @@ import java.util.Set;
  * Turning off their boot receivers isn't enough: Audible's (WorkManager) switches itself back on whenever the app
  * runs, and the shell may not change another app's components at all.
  * An app the person opened (it has a task) or one that's playing (say the car resumed it) is left alone.
+ * Their boot receivers are also switched off (after a force-stop and every 10 minutes, since Audible's turns itself
+ * back on when the app runs): on this firmware the stopped flag alone still let BOOT_COMPLETED start Audible.
  * Progress: logcat tag BoxTools, "no autostart: ...".
  */
 final class NoAutostart {
@@ -30,6 +32,7 @@ final class NoAutostart {
             "com.bambuna.podcastaddict",
     };
     private static final long WATCH_MS = 5 * 60_000, EVERY_MS = 15_000;   // boot broadcasts reach apps late
+    private static final long RECEIVERS_EVERY_MS = 10 * 60_000;
 
     private NoAutostart() { }
 
@@ -45,6 +48,16 @@ final class NoAutostart {
                     Log.w(TAG, "no autostart: check failed", e);
                 }
                 SystemClock.sleep(EVERY_MS);
+            }
+            // Audible's WorkManager turns its boot receiver back on whenever the app runs, and the stopped flag
+            // doesn't keep BOOT_COMPLETED from it on this firmware, so keep switching the receivers back off.
+            while (true) {
+                try {
+                    disableBootReceivers(app);
+                } catch (Exception e) {
+                    Log.w(TAG, "no autostart: receiver check failed", e);
+                }
+                SystemClock.sleep(RECEIVERS_EVERY_MS);
             }
         }, "no-autostart");
         t.setPriority(Thread.MIN_PRIORITY);
@@ -70,7 +83,34 @@ final class NoAutostart {
             stop.append("am force-stop ").append(p).append("; ");
             Log.i(TAG, "no autostart: stopping " + p + " (started by itself)");
         }
-        if (stop.length() > 0) ShellBridge.exec(c, stop.toString(), 15_000);
+        if (stop.length() > 0) {
+            ShellBridge.exec(c, stop.toString(), 15_000);
+            disableBootReceivers(c);
+        }
+    }
+
+    /**
+     * Switches off the listed apps' boot receivers, so the next boot doesn't start them. Needs adbd running as root,
+     * as it does on the MMB box (as plain shell, Android refuses: "Shell cannot change component state").
+     */
+    private static void disableBootReceivers(Context c) throws Exception {
+        String out = ShellBridge.exec(c, "pm query-receivers --components -a android.intent.action.BOOT_COMPLETED;"
+                + " pm query-receivers --components -a android.intent.action.LOCKED_BOOT_COMPLETED", 20_000);
+        StringBuilder off = new StringBuilder();
+        Set<String> seen = new HashSet<>();
+        for (String line : out.split("\n")) {
+            String comp = line.trim();
+            int slash = comp.indexOf('/');
+            if (slash <= 0 || !seen.add(comp)) continue;
+            String pkg = comp.substring(0, slash);
+            for (String p : PACKAGES) {
+                if (p.equals(pkg)) {
+                    off.append("pm disable ").append(comp).append(" >/dev/null; ");
+                    Log.i(TAG, "no autostart: switching off boot receiver " + comp);
+                }
+            }
+        }
+        if (off.length() > 0) ShellBridge.exec(c, off.toString(), 15_000);
     }
 
     /** Whether one of the app's media sessions is playing (PlaybackState 3), from dumpsys media_session. */
