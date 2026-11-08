@@ -51,6 +51,13 @@ also works on its own with any launcher.
   starts the launcher any more. Undo: `adb uninstall com.android.launcher3`. As a fallback, if the stock
   launcher is ever back, Box Tools switches it off after boot, takes back its runtime permissions, and keeps
   the chosen home screen.
+- **Keeps apps from starting by themselves at boot (1.24).** Only the home screen and what the box needs
+  should start at boot. For five minutes after each boot, Box Tools force-stops any app on a short list
+  (Audible, APKPure, Plex, Aladdin Connect, Home Assistant, YouTube, Netflix, VLC, Podcast Addict) that's
+  running with no window and nothing playing. Android then marks it "stopped", so it gets no boot broadcasts
+  at later boots until it's opened again. Turning off the apps' boot receivers isn't enough: Audible's switches
+  itself back on whenever the app runs, and the shell may not change another app's components. An app you
+  opened, or one that's playing (say the car resumed it), is left alone. The list is in `NoAutostart.java`.
 - **Makes sure touch works after boot (1.13).** On the MMB box, SurfaceFlinger sometimes never gets
   Android's "boot finished" call (seen with a trampoline home screen). Until it does, it never gives the input
   system its window list: the screen draws, but every touch is dropped. After each boot Box Tools waits 1 second

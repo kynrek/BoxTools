@@ -246,6 +246,7 @@ final class ShellBridge {
                         HomeKeeper.rememberInBackground(app);
                         new Thread(() -> {
                             ensureTouch(app);   // waits for sys.boot_completed
+                            NoAutostart.watchInBackground(app);
                             VendorLauncher.switchOff(app);
                             recoverWifi(app);
                             keepAppsCompiled(app);
