@@ -11,17 +11,16 @@ import java.util.Set;
  * Keeps apps that have no business running at boot from starting by themselves: after every boot, for a few
  * minutes, any app on the list that's running with no window and nothing playing is force-stopped. Android also
  * marks a force-stopped app "stopped", so it gets no boot broadcasts at later boots either, until it's opened again.
- * Turning off their boot receivers isn't enough: Audible's (WorkManager) switches itself back on whenever the app
- * runs, and the shell may not change another app's components at all.
+ * Audible was on the list until 1.26: blocking it (boot receivers and its Amazon sign-in services switched off, no
+ * background running) went with its playback stopping on drives, so it's left to start and run normally.
  * An app the person opened (it has a task) or one that's playing (say the car resumed it) is left alone.
- * Their boot receivers are also switched off (after a force-stop and every 10 minutes, since Audible's turns itself
- * back on when the app runs): on this firmware the stopped flag alone still let BOOT_COMPLETED start Audible.
+ * Their boot receivers are also switched off (after a force-stop and every 10 minutes, since a WorkManager receiver
+ * turns itself back on when the app runs): on this firmware the stopped flag alone still let BOOT_COMPLETED through.
  * Progress: logcat tag BoxTools, "no autostart: ...".
  */
 final class NoAutostart {
     private static final String TAG = "BoxTools";
     private static final String[] PACKAGES = {
-            "com.audible.application",
             "com.apkpure.aegon",
             "com.plexapp.android",
             "com.geniecompany.AladdinConnect",
@@ -49,7 +48,7 @@ final class NoAutostart {
                 }
                 SystemClock.sleep(EVERY_MS);
             }
-            // Audible's WorkManager turns its boot receiver back on whenever the app runs, and the stopped flag
+            // A WorkManager boot receiver turns itself back on whenever its app runs, and the stopped flag
             // doesn't keep BOOT_COMPLETED from it on this firmware, so keep switching the receivers back off.
             while (true) {
                 try {

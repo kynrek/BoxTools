@@ -58,14 +58,15 @@ also works on its own with any launcher.
   the chosen home screen.
 - **Keeps apps from starting by themselves at boot (1.24).** Only the home screen and what the box needs
   should start at boot. For five minutes after each boot, Box Tools force-stops any app on a short list
-  (Audible, APKPure, Plex, Aladdin Connect, Home Assistant, YouTube, Netflix, VLC, Podcast Addict) that's
+  (APKPure, Plex, Aladdin Connect, Home Assistant, YouTube, Netflix, VLC, Podcast Addict) that's
   running with no window and nothing playing. Android then marks it "stopped", so it gets no boot broadcasts
-  at later boots until it's opened again. Turning off the apps' boot receivers isn't enough: Audible's switches
-  itself back on whenever the app runs, and the shell may not change another app's components. An app you
+  at later boots until it's opened again. Turning off the apps' boot receivers isn't enough on its own: a
+  WorkManager receiver switches itself back on whenever its app runs. An app you
   opened, or one that's playing (say the car resumed it), is left alone. On this firmware the "stopped" mark alone
-  still let Audible start at boot, so (1.25) Box Tools also switches the listed apps' boot receivers off, after
-  a force-stop and every 10 minutes (Audible turns its own back on whenever it's opened). That needs the box's
-  adbd running as root, as it does on the MMB box. The list is in `NoAutostart.java`.
+  still let apps start at boot, so (1.25) Box Tools also switches the listed apps' boot receivers off, after
+  a force-stop and every 10 minutes. That needs the box's
+  adbd running as root, as it does on the MMB box. Audible was on the list until 1.26: it's now left to start and
+  run normally (it was blocked when its playback stopped on a drive, 2026-11-09). The list is in `NoAutostart.java`.
 - **Makes sure touch works after boot (1.13).** On the MMB box, SurfaceFlinger sometimes never gets
   Android's "boot finished" call (seen with a trampoline home screen). Until it does, it never gives the input
   system its window list: the screen draws, but every touch is dropped. After each boot Box Tools waits 1 second

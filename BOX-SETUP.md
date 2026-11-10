@@ -74,7 +74,6 @@ Backups taken before these changes (on the Mac, not in this repo): `joyebox-back
 | Google app `com.google.android.googlequicksearchbox` (search, Assistant, voice) | disabled | `pm enable`, then pick it as the assistant again |
 | US Mobile `com.usmobile.dashboard` | uninstalled | reinstall from Play Store or the backup |
 | Shizuku `moe.shizuku.privileged.api` (replaced by Box Tools) | uninstalled | reinstall from the backup |
-| Audible `com.audible.application` | `cmd appops set <pkg> RUN_ANY_IN_BACKGROUND ignore` | `... allow` |
 | Play Store `com.android.vending` | `cmd appops set <pkg> RUN_ANY_IN_BACKGROUND ignore` (no background updates) | `... allow` |
 
 Pre-compiled (they ran interpreted because their vendor odex didn't match): `pm compile -f -m speed` for
