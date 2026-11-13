@@ -29,6 +29,14 @@ final class NoAutostart {
             "com.netflix.mediaclient",
             "org.videolan.vlc",
             "com.bambuna.podcastaddict",
+            // 1.27: also started at boot (Play Store and YouTube Music by their boot receivers, Chrome by a push
+            // message) and none is needed then; the user picked them, 2026-11-13. They still open normally.
+            "com.teamviewer.quicksupport.market",
+            "com.google.android.apps.youtube.music",
+            "com.android.chrome",
+            "com.android.vending",
+            // 1.28: Gboard; HeliBoard is the keyboard. Whichever keyboard is the current one is never stopped.
+            "com.google.android.inputmethod.latin",
     };
     private static final long WATCH_MS = 5 * 60_000, EVERY_MS = 15_000;   // boot broadcasts reach apps late
     private static final long RECEIVERS_EVERY_MS = 10 * 60_000;
@@ -71,9 +79,11 @@ final class NoAutostart {
             running.add(colon > 0 ? n.substring(0, colon) : n);
         }
         StringBuilder stop = new StringBuilder();
-        String tasks = null, media = null;
+        String tasks = null, media = null, keyboard = null;
         for (String p : PACKAGES) {
             if (!running.contains(p)) continue;
+            if (keyboard == null) keyboard = ShellBridge.exec(c, "settings get secure default_input_method", 10_000);
+            if (keyboard.trim().startsWith(p + "/")) continue;   // the keyboard in use: Android binds it
             if (tasks == null) {
                 tasks = ShellBridge.exec(c, "am stack list", 10_000);
                 media = ShellBridge.exec(c, "dumpsys media_session", 10_000);

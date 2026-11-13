@@ -58,7 +58,9 @@ also works on its own with any launcher.
   the chosen home screen.
 - **Keeps apps from starting by themselves at boot (1.24).** Only the home screen and what the box needs
   should start at boot. For five minutes after each boot, Box Tools force-stops any app on a short list
-  (APKPure, Plex, Aladdin Connect, Home Assistant, YouTube, Netflix, VLC, Podcast Addict) that's
+  (APKPure, Plex, Aladdin Connect, Home Assistant, YouTube, Netflix, VLC, Podcast Addict; since 1.27 also
+  TeamViewer QuickSupport, YouTube Music, Chrome and the Play Store; since 1.28 Gboard, unless it's the keyboard
+  in use) that's
   running with no window and nothing playing. Android then marks it "stopped", so it gets no boot broadcasts
   at later boots until it's opened again. Turning off the apps' boot receivers isn't enough on its own: a
   WorkManager receiver switches itself back on whenever its app runs. An app you
@@ -67,11 +69,20 @@ also works on its own with any launcher.
   a force-stop and every 10 minutes. That needs the box's
   adbd running as root, as it does on the MMB box. Audible was on the list until 1.26: it's now left to start and
   run normally (it was blocked when its playback stopped on a drive, 2026-11-09). The list is in `NoAutostart.java`.
+- **Holds Google Play services back for 2 minutes after boot (1.28).** Play services used about 50 s of CPU in the
+  first minute after boot (roughly one core), then about 1% of a core. Until 2 minutes after boot, every 3 s, each
+  of its threads (uid of `com.google.android.gms`, shared with Google Services Framework) gets nice 10 and the
+  background cpuset, so the home screen and car apps get the CPU first; then each thread gets its own priority and
+  cpuset back. Nothing is switched off. (The firmware's cpuctl "background" group has the same CPU shares as
+  foreground, so moving it there wouldn't help.) Log: tag BoxTools, "boot throttle: ...". `BootThrottle.java`.
 - **Makes sure touch works after boot (1.13).** On the MMB box, SurfaceFlinger sometimes never gets
   Android's "boot finished" call (seen with a trampoline home screen). Until it does, it never gives the input
-  system its window list: the screen draws, but every touch is dropped. After each boot Box Tools waits 1 second
-  past `sys.boot_completed`, and if no window can take touches it sends SurfaceFlinger that call itself
-  (`service call SurfaceFlinger 1`; harmless when it already had it).
+  system its window list: the screen draws, but every touch is dropped. Stock Android sends that call the moment
+  the window manager ends the boot animation; since 1.29 Box Tools waits for exactly that event
+  (`logcat -b events -m 1 -s wm_boot_animation_done`) and sends SurfaceFlinger the call itself right then
+  (`service call SurfaceFlinger 1`; an extra call is ignored). Up to 1.28 it waited for `sys.boot_completed` plus
+  1 s instead: on every boot measured (2026-11-13) that was about 2 s after the animation ended. The old check
+  (1 s past `sys.boot_completed`, call again if no window takes touches) still runs as a fallback.
 - **Keeps the home screen after updates (1.11).** Updating the app that's the home screen makes Android
   forget the choice and fall back to another home app. Box Tools remembers the home screen (at boot and on
   each Home swipe) and, when that app is updated, sets it back over the box's own ADB, then goes Home if

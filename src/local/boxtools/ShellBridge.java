@@ -10,7 +10,7 @@ import android.util.Log;
  */
 final class ShellBridge {
     private static final String TAG = "BoxTools";
-    private static final int ADB_PORT = 5555;
+    static final int ADB_PORT = 5555;
     private static final long AUTH_WAIT_MS = 2 * 60_000;   // time to answer "Allow USB debugging?"
     private static final long CALL_AUTH_WAIT_MS = 5000;    // a call shouldn't hang on that prompt
     private static final long WARM_UP_GIVE_UP_MS = 3 * 60_000;   // adbd may not be listening yet right after boot
@@ -72,6 +72,23 @@ final class ShellBridge {
      * fixes it; if it already had it, SurfaceFlinger just logs "Extra call to bootFinished".
      */
     private static void ensureTouch(Context c) {
+        // Stock Android tells SurfaceFlinger the boot finished the moment the window manager ends the boot animation
+        // (event wm_boot_animation_done). This firmware never does, and until then every touch is dropped. Up to
+        // 1.28 Box Tools waited for sys.boot_completed plus 1 s: about 2 s after the animation ended on every boot
+        // measured (2026-11-13: 1.6-2.3 s). Now a logcat on its own connection waits for that event and the call
+        // goes out in the same command, with no polling delay (an extra call is ignored by SurfaceFlinger:
+        // "Extra call to bootFinished"). If that fails, the old check below still runs.
+        LocalAdb own = null;
+        try {
+            own = LocalAdb.connect(c, ADB_PORT, CALL_AUTH_WAIT_MS);
+            String at = own.exec("logcat -b events -m 1 -s wm_boot_animation_done >/dev/null 2>&1;"
+                    + " service call SurfaceFlinger 1 >/dev/null 2>&1; cut -d' ' -f1 /proc/uptime", BOOT_WAIT_MS).trim();
+            Log.i(TAG, "boot animation ended: told SurfaceFlinger the boot finished, " + at + " s after boot");
+        } catch (Exception e) {
+            Log.w(TAG, "couldn't wait for the end of the boot animation; checking touch after boot instead", e);
+        } finally {
+            if (own != null) own.close();
+        }
         try {
             long until = SystemClock.elapsedRealtime() + BOOT_WAIT_MS;   // first, for Android to finish booting
             while (!exec(c, "getprop sys.boot_completed", 5000).trim().equals("1")) {
@@ -80,7 +97,10 @@ final class ShellBridge {
             }
             until = SystemClock.elapsedRealtime() + TOUCH_GRACE_MS;   // then a moment for windows on their own
             while (SystemClock.elapsedRealtime() < until) {
-                if (inputHasDisplay(c)) return;
+                if (inputHasDisplay(c)) {
+                    Log.i(TAG, "touch works, " + SystemClock.elapsedRealtime() / 1000.0 + " s after boot");
+                    return;
+                }
                 SystemClock.sleep(1000);
             }
             if (inputHasDisplay(c)) return;
@@ -199,6 +219,13 @@ final class ShellBridge {
                 }
                 Log.i(TAG, "apps: all at speed (" + pkgs.length + " checked, " + compiled + " compiled) in "
                         + (SystemClock.elapsedRealtime() - start) / 1000 + " s");
+                // Downloaded code an app loads itself (Play services' modules in app_chimera: Maps core,
+                // Mdocstore, ...) isn't part of its APK, so the loop above doesn't compile it: it ran in the JIT.
+                // Up to date, this takes ~3 s; after a module update, ~30 s (1.28).
+                long t1 = SystemClock.elapsedRealtime();
+                own.exec("cmd package compile -m speed --secondary-dex -a >/dev/null 2>&1", 20 * 60_000);
+                Log.i(TAG, "apps: downloaded app code (secondary dex) at speed in "
+                        + (SystemClock.elapsedRealtime() - t1) / 1000 + " s");
             } catch (Exception e) {
                 Log.w(TAG, "background compile stopped", e);
             } finally {
@@ -266,6 +293,7 @@ final class ShellBridge {
         if (warming) return;
         warming = true;
         Context app = c.getApplicationContext();
+        BootThrottle.startIfBooting(app);   // only within 2 min of boot
         new Thread(() -> {
             long until = SystemClock.elapsedRealtime() + WARM_UP_GIVE_UP_MS;
             try {
