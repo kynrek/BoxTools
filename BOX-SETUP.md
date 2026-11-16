@@ -113,19 +113,24 @@ maker's support. It checks a firmware setting first.
 kernel logs (`kernel_N.ini`) live there too. The same script then copies the folder to the SD card as
 `Debug1288_log/` (the boot logs we read), which is unaffected. `debugQ.zip` on the SD card is now just the last copy.
 
-## Boot animation (looked at 2026-11-13, left unchanged)
+## Boot animation (replaced 2026-11-13)
 
-- The animation in use is `/mnt/vendor/persist/bootanimation.zip` (logcat: "...is loaded successfully"), the maker's
-  "MultiMedia Video Box" logo, 1920x720 at 30 fps: a 60-frame intro, then a 120-frame loop. The
-  `/system/media/bootanimation*.zip` files are only fallbacks.
+- The animation in use is `/mnt/vendor/persist/bootanimation.zip` (logcat: "...is loaded successfully"). The
+  `/system/media/bootanimation*.zip` files are only fallbacks. The partition is 27 MB; nothing else on it uses more
+  than 1 MB, but it also holds the box's calibration data, so keep the zip well under its free space.
+- Since 2026-11-13 it's the owner's own pixel-art road-trip GIF: 1180x480 (the screen size, so nothing is scaled),
+  20 fps, the drive played once (`p 1 8 part0`) and then its last frame held (`p 0 0 part1`) until the boot finishes.
+  Format rules: the zip must be stored (no compression; the player reads frames straight from it); the PNGs inside
+  are compressed: 256 colours plus oxipng, 13 MB for 62 frames (all-colour PNGs came to 55 MB).
+- The maker's original ("MultiMedia Video Box" logo, 1920x720, 30 fps, a 60-frame intro then a 120-frame loop) is in
+  `BoxRecovery/bootanimation-original/` on the SD card; the new one is in `BoxRecovery/bootanimation-roadtrip/`.
 - `copyZsender.sh` can replace or remove it from the SD card without adb: `bootanimation_config.txt` saying
   `update_bootanimation` (copies the SD card's `bootanimation.zip` in) or `delete_bootanimation` (removes it;
   needs some `bootanimation.zip` on the card too).
 - Started by hand (`setprop ctl.start bootanim`), it never quits on its own, even the original; stop it with
-  `setprop ctl.stop bootanim`. At boot the "boot finished" call ends it.
-- A lighter version (1180x443, 15 fps, a single loop frame, 0.7 MB instead of 8.6 MB) booted fine twice, adb and
-  touch unaffected, but saved nothing: both use about 0.33 CPU-seconds per 10 s (frames are loaded once). So the
-  original was put back. A copy of the original is in `BoxRecovery/bootanimation-original/` on the SD card.
+  `setprop ctl.stop bootanim`. At boot the "boot finished" call ends it. Screenshots don't show its layer.
+- The animation doesn't change boot time: the original, a light 0.7 MB test version and the road trip all use about
+  the same CPU, and the map took touches at 23–25 s after boot with each.
 
 ## Boot timeline (2026-11-13, seconds since the kernel started)
 
@@ -163,4 +168,4 @@ internet). APN: T-Mobile US 240 selected (US Mobile SIM).
 
 `com.tinker.core`, `com.tinker.helper` (only its log copy setting changed, see above), CarPlay (`com.zjinnova.zlink`),
 `com.applepie.bluetooth` / `setting`, the `connect-ap.sh` car Wi-Fi script, qti/ims/phone, Google Play services,
-MediaProvider, Google text-to-speech (MiniMap's voice), the boot animation.
+MediaProvider, Google text-to-speech (MiniMap's voice).

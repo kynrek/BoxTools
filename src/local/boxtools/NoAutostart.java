@@ -15,7 +15,8 @@ import java.util.Set;
  * background running) went with its playback stopping on drives, so it's left to start and run normally.
  * An app the person opened (it has a task) or one that's playing (say the car resumed it) is left alone.
  * Their boot receivers are also switched off (after a force-stop and every 10 minutes, since a WorkManager receiver
- * turns itself back on when the app runs): on this firmware the stopped flag alone still let BOOT_COMPLETED through.
+ * turns itself back on when the app runs; only while the app isn't running, see disableBootReceivers): on this
+ * firmware the stopped flag alone still let BOOT_COMPLETED through.
  * Progress: logcat tag BoxTools, "no autostart: ...".
  */
 final class NoAutostart {
@@ -71,13 +72,19 @@ final class NoAutostart {
         t.start();
     }
 
-    private static void check(Context c) throws Exception {
+    /** Package names with a running process (a:service counts as a). */
+    private static Set<String> runningPackages(Context c) throws Exception {
         Set<String> running = new HashSet<>();
         for (String name : ShellBridge.exec(c, "ps -A -o NAME", 10_000).split("\n")) {
             String n = name.trim();
-            int colon = n.indexOf(':');   // a:service counts as a
+            int colon = n.indexOf(':');
             running.add(colon > 0 ? n.substring(0, colon) : n);
         }
+        return running;
+    }
+
+    private static void check(Context c) throws Exception {
+        Set<String> running = runningPackages(c);
         StringBuilder stop = new StringBuilder();
         String tasks = null, media = null, keyboard = null;
         for (String p : PACKAGES) {
@@ -101,12 +108,18 @@ final class NoAutostart {
     /**
      * Switches off the listed apps' boot receivers, so the next boot doesn't start them. Needs adbd running as root,
      * as it does on the MMB box (as plain shell, Android refuses: "Shell cannot change component state").
+     * <p>
+     * Only for apps that aren't running: switching off a component makes Android kill its app ("change pkg"), which
+     * closed the keyboard in the middle of typing every 10 minutes (Gboard's WorkManager receiver turns itself back
+     * on whenever Gboard runs; seen 2026-11-16) and would close a playing YouTube Music the same way. A receiver only
+     * turns itself back on while its app runs, so a later pass, once the app has closed, still catches it.
      */
     private static void disableBootReceivers(Context c) throws Exception {
+        Set<String> running = runningPackages(c);
         String out = ShellBridge.exec(c, "pm query-receivers --components -a android.intent.action.BOOT_COMPLETED;"
                 + " pm query-receivers --components -a android.intent.action.LOCKED_BOOT_COMPLETED", 20_000);
         StringBuilder off = new StringBuilder();
-        Set<String> seen = new HashSet<>();
+        Set<String> seen = new HashSet<>(), skipped = new HashSet<>();
         for (String line : out.split("\n")) {
             String comp = line.trim();
             int slash = comp.indexOf('/');
@@ -114,6 +127,10 @@ final class NoAutostart {
             String pkg = comp.substring(0, slash);
             for (String p : PACKAGES) {
                 if (p.equals(pkg)) {
+                    if (running.contains(pkg)) {
+                        if (skipped.add(pkg)) Log.i(TAG, "no autostart: " + pkg + " is running; its boot receivers are left for later");
+                        continue;
+                    }
                     off.append("pm disable ").append(comp).append(" >/dev/null; ");
                     Log.i(TAG, "no autostart: switching off boot receiver " + comp);
                 }

@@ -66,7 +66,8 @@ also works on its own with any launcher.
   WorkManager receiver switches itself back on whenever its app runs. An app you
   opened, or one that's playing (say the car resumed it), is left alone. On this firmware the "stopped" mark alone
   still let apps start at boot, so (1.25) Box Tools also switches the listed apps' boot receivers off, after
-  a force-stop and every 10 minutes. That needs the box's
+  a force-stop and every 10 minutes, but (1.30) only while the app isn't running: switching off a component makes
+  Android kill its app, which closed the keyboard mid-typing every 10 minutes. That needs the box's
   adbd running as root, as it does on the MMB box. Audible was on the list until 1.26: it's now left to start and
   run normally (it was blocked when its playback stopped on a drive, 2026-11-09). The list is in `NoAutostart.java`.
 - **Holds Google Play services back for 2 minutes after boot (1.28).** Play services used about 50 s of CPU in the
